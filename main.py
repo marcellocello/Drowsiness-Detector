@@ -16,11 +16,8 @@ def ensure_predictor_exists():
         os.remove(PREDICTOR_MODEL)
     if not os.path.exists(PREDICTOR_MODEL):
         print("[INFO] File predictor 68 landmark belum ada. Mengunduh model (~99MB)...")
-
         url = f"https://raw.githubusercontent.com/tzutalin/dlib-android/master/data/{PREDICTOR_MODEL}"
-
         print(f"[INFO] Downloading {PREDICTOR_MODEL} ...")
-
         urllib.request.urlretrieve(url, PREDICTOR_MODEL)
         print("[INFO] Download berhasil & file utuh!")
 
@@ -68,9 +65,7 @@ def run_drowsiness_detector(camera_index=0):
     face_detector = dlib.get_frontal_face_detector()
     dlib_facelandmark = dlib.shape_predictor(PREDICTOR_MODEL)
 
-    line_color = (0, 255, 0)
-    status_state = "MELEK"
-    closed_start_time = None
+    closed_start_time = {}
 
     while True:
         ret, frame = cap.read()
@@ -79,10 +74,11 @@ def run_drowsiness_detector(camera_index=0):
 
         gray_scale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_detector(gray_scale)
-        face_found = False
+        active_face_ids = set()
 
-        for face in faces:
-            face_found = True
+        for idx, face in enumerate(faces):
+            active_face_ids.add(idx)
+
             face_landmarks = dlib_facelandmark(gray_scale, face)
             lefteye = [(face_landmarks.part(n).x, face_landmarks.part(n).y) for n in range(36, 42)]
             righteye = [(face_landmarks.part(n).x, face_landmarks.part(n).y) for n in range(42, 48)]
@@ -93,34 +89,38 @@ def run_drowsiness_detector(camera_index=0):
 
             is_curr_closed = eye_ratio < THRES_EAR
             if not is_curr_closed:
-                closed_start_time = None
+                closed_start_time[idx] = None
                 line_color = (0, 255, 0)
-                status_state = "MELEK"
+                eye_state = "MELEK"
             else:
-                if closed_start_time is None:
-                    closed_start_time = time.time()
+                if closed_start_time.get(idx) is None:
+                    closed_start_time[idx] = time.time()
                 
-                closed_duration = time.time() - closed_start_time
+                closed_duration = time.time() - closed_start_time[idx]
 
                 if closed_duration >= THRES_TIDUR:
-                    status_state = "TERDETEKSI TIDUR"
+                    eye_state = "TIDUR"
                     line_color = (0, 0, 255)
-                    cv2.putText(frame, "ALERT!! BANGUNNN!!!!", (40, 120), cv2.FONT_HERSHEY_PLAIN, 2, line_color, 3)
                 elif closed_duration >= THRES_NGANTUK:
                     line_color = (0, 165, 255)
-                    status_state = "TERDETEKSI NGANTUK"
-                    cv2.putText(frame, "ALERT!! BANGUNNN!!!!", (40, 120), cv2.FONT_HERSHEY_PLAIN, 2, line_color, 3)
+                    eye_state = "NGANTUK"
                 else:
-                    status_state = "MELEK"
+                    eye_state = "MELEK"
                     line_color = (0, 255, 0)
 
-            cv2.putText(frame, status_state, (40, 80), cv2.FONT_HERSHEY_PLAIN, 2, line_color, 3)
+            x, y = face.left(), face.top()
+            cv2.rectangle(frame, (face.left(), face.top()), (face.right(), face.bottom()), line_color, 2)
+            cv2.putText(frame, f"Wajah #{idx+1}: {eye_state}", (x, max(10, y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, line_color, 2)
+
+            if eye_state in ["NGANTUK", "TIDUR"]:
+                cv2.putText(frame, "ALERT!! BANGUNNN!!!!", (x, face.bottom() + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, line_color, 2)
 
             draw_eye_contours(frame, face_landmarks, range(42, 48), line_color)
             draw_eye_contours(frame, face_landmarks, range(36, 42), line_color)
 
-        if not face_found:
-            closed_start_time = None
+        for old_id in list(closed_start_time.keys()):
+            if old_id not in active_face_ids:
+                del closed_start_time[old_id]
 
         cv2.imshow("Drowsiness Detector", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
