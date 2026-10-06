@@ -1,0 +1,23 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Python Cache Files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Large AI Weights & Model Files
+*.dat
+*.bz2
+*.pt
+*.onnx
+
+# macOS System Files
+.DS_Store
+
+# IDE & Editor Files
+.vscode/
+.idea/
