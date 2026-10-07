@@ -21,3 +21,5 @@ __pycache__/
 # IDE & Editor Files
 .vscode/
 .idea/
+
+snapshots/
