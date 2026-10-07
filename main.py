@@ -105,7 +105,6 @@ def run_drowsiness_detector(camera_index=0):
             eye_ratio = round((leftear + rightear) / 2, 2)
 
             ear_trend.append(eye_ratio)
-            print(ear_trend)
             clean_frame = frame.copy()
 
             if not eye_ratio < THRES_EAR:
